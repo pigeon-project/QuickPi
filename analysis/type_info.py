@@ -1,6 +1,10 @@
-from typing import TypeVar
+from typing import TypeVar, List, Dict
+
+from typing_extensions import ClassVar
 
 from .utils import Name
+
+builtin_type = ('object', 'bool', 'int', 'float', 'str', 'tuple', 'list', 'set', 'dict')
 
 
 class TypeInfo:
@@ -44,3 +48,19 @@ class NoneType(NoMemberType):
 
 class TypeApply(ProperType):
     pass
+
+
+class TypedDictType(ProperType):
+    record: ClassVar[Dict[Name, TypeInfo]]
+
+
+class UnionType(ProperType):
+    include_type: ClassVar[List[TypeInfo]]
+
+
+class TupleType(ProperType):
+    include_type: ClassVar[List[TypeInfo]]
+
+
+class ListType(ProperType):
+    include_type: ClassVar[TypeInfo]

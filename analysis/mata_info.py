@@ -2,7 +2,7 @@ from _ast import AST
 from pathlib import Path
 from typing import List, Dict, Union, Tuple, Optional
 
-from typing_extensions import TypedDict
+from typing_extensions import TypedDict, ClassVar
 
 from .type_info import TypeInfo
 from .utils import Name
@@ -23,16 +23,64 @@ class FunctionInfo(TypedDict):
     variables: List[Union[Name, TypeInfo]]
     body: List[AST]
     parent: Tuple['FunctionInfo']
+    top_level: 'FileMataInfo'
 
 
-class ClassInfo(TypedDict):
-    name: Name
-    fullname: Name
-    items: Dict[Name, TypeInfo]
-    methods: Dict[Name, FunctionInfo]
-    static_items: Dict[Name, Union[TypeInfo, AST]]
-    static_function: Dict[Name, FunctionInfo]
-    parent: List['ClassInfo']
+class ClassInfo:
+    name: ClassVar[Name]
+    fullname: ClassVar[Name]
+    items: ClassVar[Dict[Name, TypeInfo]]
+    methods: ClassVar[Dict[Name, FunctionInfo]]
+    static_items: ClassVar[Dict[Name, Tuple[TypeInfo, AST]]]
+    static_function: ClassVar[Dict[Name, FunctionInfo]]
+    parent: ClassVar[List['ClassInfo']]
+    top_level: ClassVar['FileMataInfo']
+
+    def __init__(
+            self,
+            name: Name,
+            fullname: Name,
+            parent: List['ClassInfo'],
+            top_level: 'FileMataInfo'):
+        self.name = name
+        self.fullname = fullname
+        self.items = {}
+        self.methods = {}
+        self.static_items = {}
+        self.static_function = {}
+        self.parent = parent
+        self.top_level = top_level
+
+    def find_item(self, name: Name) -> Optional[TypeInfo]:
+        r: Optional[TypeInfo] = self.items.get(name)
+        if r:
+            return r
+        for i in self.parent:
+            r = i.find_item(name)
+            if r is not None:
+                return r
+        return None
+
+    def find_static_item(self, name: Name) -> Optional[Tuple[TypeInfo, AST]]:
+        r: Optional[Tuple[TypeInfo, AST]] = self.static_items.get(name)
+        if r:
+            return r
+        for i in self.parent:
+            r = i.find_static_item(name)
+            if r is not None:
+                return r
+        return None
+
+    def find_function(self, name: Name) -> Optional[FunctionInfo]:
+        r: Optional[FunctionInfo] = self.methods.get(name)
+        if r is None:
+            r = self.static_function.get(name)
+        if r is None:
+            for i in self.parent:
+                r = i.find_function(name)
+                if r is not None:
+                    return r
+        return r
 
 
 class FileMataInfo(TypedDict):
@@ -44,3 +92,6 @@ class FileMataInfo(TypedDict):
     functions: Dict[Name, FunctionInfo]
     do_block: List[ExprInfo]
     export_list: List[Name]
+
+
+Context = Union[FileMataInfo, ClassInfo, FunctionInfo]
