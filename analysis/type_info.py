@@ -1,10 +1,9 @@
-from typing import TypeVar, List, Dict
+from typing import TypeVar, List, Dict, Set, Optional
 
 from typing_extensions import ClassVar
 
+from .mata_info import Context, ClassInfo
 from .utils import Name
-
-builtin_type = ('object', 'bool', 'int', 'float', 'str', 'tuple', 'list', 'set', 'dict')
 
 
 class TypeInfo:
@@ -14,10 +13,15 @@ class TypeInfo:
 
 class TypeRef(TypeInfo):
     name: TypeVar[Name]
+    fullname: TypeVar[Optional[Name]]
 
-    def __init__(self, name: Name):
+    def __init__(self, name: Name, fullname: Optional[Name] = None):
         super().__init__()
         self.name = name
+        self.fullname = fullname
+
+    def get_true_type(self, context: Context) -> ClassInfo:
+        pass
 
 
 """
@@ -55,7 +59,7 @@ class TypedDictType(ProperType):
 
 
 class UnionType(ProperType):
-    include_type: ClassVar[List[TypeInfo]]
+    include_type: ClassVar[Set[TypeInfo]]
 
 
 class TupleType(ProperType):
@@ -64,3 +68,14 @@ class TupleType(ProperType):
 
 class ListType(ProperType):
     include_type: ClassVar[TypeInfo]
+
+
+builtin_type = ('object', 'bool', 'int', 'float', 'str', 'tuple', 'list', 'set', 'dict')
+
+builtin_object = TypeRef('bool', 'qpy.builtin.object')
+builtin_none = TypeRef('none', 'qpy.builtin.none')
+builtin_bool = TypeRef('bool', 'qpy.builtin.bool')
+builtin_str = TypeRef('str', 'qpy.builtin.str')
+builtin_int = TypeRef('int', 'qpy.builtin.int')
+builtin_float = TypeRef('float', 'qpy.builtin.float')
+builtin_bytes = TypeRef('bytes', 'qpy.builtin.bytes')

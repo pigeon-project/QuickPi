@@ -23,7 +23,7 @@ class FunctionInfo(TypedDict):
     variables: List[Union[Name, TypeInfo]]
     body: List[AST]
     parent: Tuple['FunctionInfo']
-    top_level: 'FileMataInfo'
+    # top_level: 'FileMataInfo'
 
 
 class ClassInfo:
@@ -51,7 +51,15 @@ class ClassInfo:
         self.parent = parent
         self.top_level = top_level
 
-    def find_item(self, name: Name) -> Optional[TypeInfo]:
+    def is_instance(self, other: 'ClassInfo') -> bool:
+        if self is other:
+            return True
+        for i in self.parent:
+            if i.is_instance(other):
+                return True
+        return False
+
+    def find_item(self, name: Name) -> TypeInfo:
         r: Optional[TypeInfo] = self.items.get(name)
         if r:
             return r
@@ -59,9 +67,9 @@ class ClassInfo:
             r = i.find_item(name)
             if r is not None:
                 return r
-        return None
+        raise KeyError
 
-    def find_static_item(self, name: Name) -> Optional[Tuple[TypeInfo, AST]]:
+    def find_static_item(self, name: Name) -> Tuple[TypeInfo, AST]:
         r: Optional[Tuple[TypeInfo, AST]] = self.static_items.get(name)
         if r:
             return r
@@ -69,18 +77,25 @@ class ClassInfo:
             r = i.find_static_item(name)
             if r is not None:
                 return r
-        return None
+        raise KeyError
 
-    def find_function(self, name: Name) -> Optional[FunctionInfo]:
+    def find_method(self, name: Name) -> FunctionInfo:
         r: Optional[FunctionInfo] = self.methods.get(name)
         if r is None:
-            r = self.static_function.get(name)
-        if r is None:
             for i in self.parent:
-                r = i.find_function(name)
+                r = i.find_method(name)
                 if r is not None:
                     return r
-        return r
+        raise KeyError
+
+    def find_static_method(self, name: Name) -> FunctionInfo:
+        r: Optional[FunctionInfo] = self.static_function.get(name)
+        if r is None:
+            for i in self.parent:
+                r = i.find_static_method(name)
+                if r is not None:
+                    return r
+        raise KeyError
 
 
 class FileMataInfo(TypedDict):
