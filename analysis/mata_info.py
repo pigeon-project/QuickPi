@@ -1,6 +1,6 @@
-from _ast import AST
+from ast import AST
 from pathlib import Path
-from typing import List, Dict, Union, Tuple, Optional
+from typing import List, Dict, Union, Tuple, Optional, Any
 
 from typing_extensions import TypedDict, ClassVar
 
@@ -8,25 +8,55 @@ from .type_info import TypeInfo
 from .utils import Name
 
 
-class ExprInfo(TypedDict):
-    expr: AST
-    type: TypeInfo
+class NameSpace:
+    def get_top_level(self) -> 'NameSpace':
+        pass
 
 
-class FunctionInfo(TypedDict):
-    is_loose: bool
+class OneNameSpace(NameSpace):
+    def find_name(self, name: Name) -> Any:
+        ...
+
+
+class TwoNameSpace(NameSpace):
+    pass
+
+
+class ObjectBind:
+    name: ClassVar[Name]
+    fullname: ClassVar[Name]
+    typeinfo: ClassVar[Optional[TypeInfo]]
+    top_level: ClassVar['ModuleMataInfo']
+
+    # value: ClassVar[Optional[AST]]
+    def __init__(
+            self,
+            name: Name,
+            fullname: Name,
+            typeinfo: Optional[TypeInfo] = None
+    ):
+        self.name = name
+        self.fullname = fullname
+        self.typeinfo = typeinfo
+
+
+class FunctionInfo(OneNameSpace):
+    strict: bool
     is_async: bool
-    is_pure: bool
+    is_pure: Optional[bool]
     name: Name
     fullname: Name
     params: Dict[Name, Tuple[Optional[TypeInfo], Optional[AST]]]
     variables: List[Union[Name, TypeInfo]]
     body: List[AST]
     parent: Tuple['FunctionInfo']
-    # top_level: 'FileMataInfo'
+    top_level: ClassVar['ModuleMataInfo']
+
+    def get_top_level(self) -> 'ModuleMataInfo':
+        return self.top_level
 
 
-class ClassInfo:
+class ClassInfo(TwoNameSpace):
     name: ClassVar[Name]
     fullname: ClassVar[Name]
     items: ClassVar[Dict[Name, TypeInfo]]
@@ -34,14 +64,14 @@ class ClassInfo:
     static_items: ClassVar[Dict[Name, Tuple[TypeInfo, AST]]]
     static_function: ClassVar[Dict[Name, FunctionInfo]]
     parent: ClassVar[List['ClassInfo']]
-    top_level: ClassVar['FileMataInfo']
+    top_level: ClassVar['ModuleMataInfo']
 
     def __init__(
             self,
             name: Name,
             fullname: Name,
             parent: List['ClassInfo'],
-            top_level: 'FileMataInfo'):
+            top_level: 'ModuleMataInfo'):
         self.name = name
         self.fullname = fullname
         self.items = {}
@@ -50,6 +80,9 @@ class ClassInfo:
         self.static_function = {}
         self.parent = parent
         self.top_level = top_level
+
+    def get_top_level(self) -> 'ModuleMataInfo':
+        return self.top_level
 
     def is_instance(self, other: 'ClassInfo') -> bool:
         if self is other:
@@ -98,15 +131,37 @@ class ClassInfo:
         raise KeyError
 
 
-class FileMataInfo(TypedDict):
-    name: Name
-    fullname: Name
-    path: Path
-    import_list: Dict[Name, Union[ClassInfo, FunctionInfo, Name, 'FileMataInfo']]
-    classes: Dict[Name, ClassInfo]
-    functions: Dict[Name, FunctionInfo]
-    do_block: List[ExprInfo]
-    export_list: List[Name]
+class ModuleMataInfo(OneNameSpace):
+    name: ClassVar[Name]
+    fullname: ClassVar[Name]
+    path: ClassVar[Path]
+    import_list: ClassVar[Dict[Name, 'Context']]
+    bind: ClassVar[Dict[Name, 'Context']]
+    do_block: ClassVar[List[AST]]
+    export_list: ClassVar[List[Name]]
+
+    def __init__(
+            self,
+            name: ClassVar[Name],
+            fullname: ClassVar[Name],
+            path: ClassVar[Path]
+    ):
+        self.name = name
+        self.fullname = fullname
+        self.path = path
+        self.import_list = {}
+        self.bind = {}
+        self.do_block = []
+        self.export_list = []
+
+    def find_name(self, name: Name) -> Optional['Context']:
+        r = self.bind.get(name)
+        if r is None:
+            r = self.import_list.get(name)
+        return r
+
+    def get_top_level(self) -> 'ModuleMataInfo':
+        return self
 
 
-Context = Union[FileMataInfo, ClassInfo, FunctionInfo]
+Context = Union[ModuleMataInfo, FunctionInfo, ClassInfo, ObjectBind]

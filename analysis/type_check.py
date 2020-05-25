@@ -1,14 +1,16 @@
 # import ast
-from ast import AST, Num, Str, expr, Bytes, Call, stmt, AnnAssign, BoolOp, And, Or, Not
+from ast import AST, Num, Str, expr, Bytes, Call, stmt, AnnAssign, BoolOp, And, Or, Not, Assign
 
-from .mata_info import Context
+from .mata_info import Context, OneNameSpace, TwoNameSpace, ClassInfo
 from .type_info import TypeInfo, TypeRef, builtin_bool, builtin_bytes, builtin_float, builtin_int, builtin_str
+from .utils import AnalysisError, PosInfo
 
 macig_method_map = {
     And: '__and__',
     Or: '__or__',
     Not: '__not__',
 }
+
 
 def type_assert(ast: AST, type: TypeInfo):
     pass
@@ -49,17 +51,29 @@ def type_infer(context: Context, ast: AST) -> TypeInfo:
     pass
 
 
-def annassign_check(context: Context, ast: AnnAssign):
+def ann_assign_check(context: Context, ast: AnnAssign):
+    if isinstance(context, ClassInfo):
+        raise AnalysisError("Context invalid", PosInfo(ast), context.get_top_level())
+    name = context.find_name(ast.target.id)
+
+    assert False
+
+
+def assign_check(context: Context, ast: Assign, strict: bool = True):
+    if strict:
+        pass
     pass
 
 
-def statement_check(context: Context, ast: stmt):
+def statement_check(context: Context, ast: stmt, strict: bool = True):
     if isinstance(ast, AnnAssign):
-        return annassign_check(context, ast)
+        return ann_assign_check(context, ast)
+    if isinstance(ast, Assign):
+        return assign_check(context, ast, strict)
     pass
 
 
-def type_check(context: Context, ast: AST):
+def type_check(context: Context, ast: AST, strict: bool = True):
     if isinstance(ast, stmt):
         return statement_check(context, ast)
     # type_infer(context, ast)
