@@ -4,7 +4,7 @@ from typing import List, Dict, Union, Tuple, Optional, Any
 
 from typing_extensions import TypedDict, ClassVar
 
-from .type_info import TypeInfo
+from .type_info import TypeInfo, ProperType
 from .utils import Name
 
 
@@ -39,8 +39,12 @@ class ObjectBind:
         self.fullname = fullname
         self.typeinfo = typeinfo
 
+    # class Callable(ProperType):
+    #     params_type: ClassVar[UnionType[]]
+    # pass
 
-class FunctionInfo(OneNameSpace):
+
+class FunctionInfo(OneNameSpace, ProperType):
     strict: bool
     is_async: bool
     is_pure: Optional[bool]
@@ -56,7 +60,7 @@ class FunctionInfo(OneNameSpace):
         return self.top_level
 
 
-class ClassInfo(TwoNameSpace):
+class ClassInfo(TwoNameSpace, ProperType):
     name: ClassVar[Name]
     fullname: ClassVar[Name]
     items: ClassVar[Dict[Name, TypeInfo]]
@@ -71,7 +75,9 @@ class ClassInfo(TwoNameSpace):
             name: Name,
             fullname: Name,
             parent: List['ClassInfo'],
-            top_level: 'ModuleMataInfo'):
+            top_level: 'ModuleMataInfo'
+    ):
+        super().__init__()
         self.name = name
         self.fullname = fullname
         self.items = {}

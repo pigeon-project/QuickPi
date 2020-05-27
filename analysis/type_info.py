@@ -8,7 +8,13 @@ from .utils import Name
 
 class TypeInfo:
     def __init__(self):
-        pass
+        ...
+
+    def __str__(self):
+        ...
+
+    # def join(self, other: 'TypeInfo') -> 'TypeInfo':
+    #     ...
 
 
 class TypeRef(TypeInfo):
@@ -31,7 +37,10 @@ class AliasType(TypeInfo):
 
 
 class ProperType(TypeInfo):
-    pass
+    def join(self, other: 'TypeInfo') -> 'TypeInfo':
+        if isinstance(self, AnyType) or isinstance(other, AnyType):
+            return AnyType()
+        return UnionType({self, other})
 
 
 class AnyType(ProperType):
@@ -60,6 +69,10 @@ class TypedDictType(ProperType):
 
 class UnionType(ProperType):
     include_type: ClassVar[Set[TypeInfo]]
+
+    def __init__(self, i: Set[TypeInfo]):
+        super().__init__()
+        self.include_type = i
 
 
 class TupleType(ProperType):
