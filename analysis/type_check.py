@@ -3,7 +3,7 @@ import typing
 from ast import AST, Num, Str, expr, Bytes, stmt, AnnAssign, BoolOp, And, Or, Not, Assign, Expr, Raise, With, AsyncWith
 
 from .mata_info import Context, ClassInfo, FunctionInfo, OneNameSpace, ObjectBind
-from .type_info import TypeInfo, TypeRef, NoneType, BottomType, AnyType
+from .mata_info import TypeInfo, TypeRef, NoneType, BottomType, AnyType
 # from .type_info import builtin_bytes, builtin_float, builtin_int, builtin_str
 from .utils import AnalysisError, PosInfo, AnalysisWarning
 
@@ -41,6 +41,7 @@ def expr_infer(context: Context, ast: expr) -> TypeInfo:
             # todo: 没写完
         else:
             raise RuntimeError('喵喵喵喵喵？')
+    raise RuntimeError('喵喵喵喵喵？')
         # left_type.
         # type_assert(ast.values[0], builtin_bool)
         # type_assert(ast.values[1], builtin_bool)
@@ -100,6 +101,11 @@ def with_check(context: Context, ast: typing.Union[With, AsyncWith]):
 
 
 def stmt_check(context: Context, ast: stmt, strict: bool = True):
+    if isinstance(ast, Expr):
+        res = expr_infer(context, ast.value)
+        if not (isinstance(res, BottomType) or isinstance(res, NoneType)):
+            # FIXME
+            print(AnalysisWarning(f'Unused value of type {res}', PosInfo(ast), context.get_top_level()))
     if isinstance(ast, AnnAssign):
         return ann_assign_check(context, ast)
     if isinstance(ast, Assign):
@@ -113,7 +119,8 @@ def stmt_check(context: Context, ast: stmt, strict: bool = True):
         with_check(context, ast)
     if isinstance(ast, AsyncWith):
         # TODO: check function is async function code
-
+        if isinstance(context, FunctionInfo) and context.is_async:
+            print(AnalysisWarning("await is not in async function", PosInfo(ast), context.get_top_level()))
         with_check(context, ast)
     pass
 

@@ -1,7 +1,9 @@
 from ast import AST
+
+from typing import Any
 from typing_extensions import ClassVar
 
-from .mata_info import ModuleMataInfo
+
 
 Name = str
 
@@ -18,13 +20,13 @@ class PosInfo:
 class AnalysisWarning(RuntimeWarning):
     message: ClassVar[str]
     pos: ClassVar[PosInfo]
-    top_level: ClassVar[ModuleMataInfo]
+    top_level: ClassVar
 
     def __init__(
             self,
             message: str,
             pos: PosInfo,
-            top_level: ModuleMataInfo
+            top_level: Any
     ):
         self.message = message
         self.pos = pos
@@ -38,13 +40,13 @@ class AnalysisWarning(RuntimeWarning):
 class AnalysisError(RuntimeError):
     message: ClassVar[str]
     pos: ClassVar[PosInfo]
-    top_level: ClassVar[ModuleMataInfo]
+    top_level: ClassVar
 
     def __init__(
             self,
             message: str,
             pos: PosInfo,
-            top_level: ModuleMataInfo
+            top_level: Any
     ):
         self.message = message
         self.pos = pos
