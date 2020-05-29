@@ -1,9 +1,10 @@
 # import ast
 import typing
-from ast import AST, Num, Str, expr, Bytes, stmt, AnnAssign, BoolOp, And, Or, Not, Assign, Expr
+from ast import AST, Num, Str, expr, Bytes, stmt, AnnAssign, BoolOp, And, Or, Not, Assign, Expr, Raise, With, AsyncWith
 
-from .mata_info import Context, ClassInfo
-from .type_info import TypeInfo, TypeRef, builtin_bytes, builtin_float, builtin_int, builtin_str, NoneType, BottomType
+from .mata_info import Context, ClassInfo, FunctionInfo, OneNameSpace, ObjectBind
+from .type_info import TypeInfo, TypeRef, NoneType, BottomType, AnyType
+# from .type_info import builtin_bytes, builtin_float, builtin_int, builtin_str
 from .utils import AnalysisError, PosInfo, AnalysisWarning
 
 macig_method_map = {
@@ -19,15 +20,19 @@ macig_method_map = {
 
 def expr_infer(context: Context, ast: expr) -> TypeInfo:
     if isinstance(ast, Str):
-        return builtin_str
+        return AnyType()
+        # return builtin_str
     if isinstance(ast, Num):
         if isinstance(ast.n, int):
-            return builtin_int
+            return AnyType()
+            # return builtin_int
         if isinstance(ast.n, float):
-            return builtin_float
+            return AnyType()
+            # return builtin_float
         assert False
     if isinstance(ast, Bytes):
-        return builtin_bytes
+        return AnyType()
+        # return builtin_bytes
     if isinstance(ast, BoolOp):
         left_type = type_infer(context, ast.values[0])
         if isinstance(left_type, TypeRef):
@@ -78,15 +83,42 @@ def assign_check(context: Context, ast: Assign, strict: bool = True):
     pass
 
 
+def with_check(context: Context, ast: typing.Union[With, AsyncWith]):
+    c1 = context  # 为了绕过类型检查
+    if not isinstance(context, OneNameSpace):
+        raise AnalysisError("context error", PosInfo(ast), context.get_top_level())
+    for i in ast.items:
+        res = expr_infer(c1, i.context_expr)
+        # TODO: __enter__ and __exit__ method check
+        if i.optional_vars:
+            id = i.optional_vars.id
+            context.add_symbol(id, ObjectBind(
+                id, c1.get_top_level().get_prev_name() + id, res))
+        else:
+            print(AnalysisWarning(f'Unused value of type {res}', PosInfo(i), c1.get_top_level()))
+    return block_infer(c1, ast.body)
+
+
 def stmt_check(context: Context, ast: stmt, strict: bool = True):
     if isinstance(ast, AnnAssign):
         return ann_assign_check(context, ast)
     if isinstance(ast, Assign):
         return assign_check(context, ast, strict)
+    if isinstance(ast, Raise):
+        if isinstance(context, FunctionInfo):
+            context.add_throw_type(type_infer(context, ast.exc))
+        else:
+            raise AnalysisError("context error", PosInfo(ast), context.get_top_level())
+    if isinstance(ast, With):
+        with_check(context, ast)
+    if isinstance(ast, AsyncWith):
+        # TODO: check function is async function code
+
+        with_check(context, ast)
     pass
 
 
 def type_check(context: Context, ast: AST, strict: bool = True):
     if isinstance(ast, stmt):
-        return stmt_check(context, ast)
+        return stmt_check(context, ast, strict)
     # type_infer(context, ast)

@@ -1,4 +1,4 @@
 # QuickPi
 The Pigeon Project sub project QuickPython
 
-A quick compiler from Python to Native
+QuickPi is a quick compiler from Python to native or some other platforms

@@ -1,10 +1,10 @@
 from ast import AST
 from pathlib import Path
-from typing import List, Dict, Union, Tuple, Optional, Any
+from typing import List, Dict, Union, Tuple, Optional
 
-from typing_extensions import TypedDict, ClassVar
+from typing_extensions import ClassVar
 
-from .type_info import TypeInfo, ProperType
+from .type_info import TypeInfo, ProperType, QTypeVar
 from .utils import Name
 
 
@@ -14,7 +14,10 @@ class NameSpace:
 
 
 class OneNameSpace(NameSpace):
-    def find_name(self, name: Name) -> Any:
+    def add_symbol(self, name: Name, value: 'Context'):
+        ...
+
+    def find_name(self, name: Name) -> 'Context':
         ...
 
 
@@ -25,7 +28,7 @@ class TwoNameSpace(NameSpace):
 class ObjectBind:
     name: ClassVar[Name]
     fullname: ClassVar[Name]
-    typeinfo: ClassVar[Optional[TypeInfo]]
+    typeinfo: ClassVar[TypeInfo]
     top_level: ClassVar['ModuleMataInfo']
 
     # value: ClassVar[Optional[AST]]
@@ -33,7 +36,7 @@ class ObjectBind:
             self,
             name: Name,
             fullname: Name,
-            typeinfo: Optional[TypeInfo] = None
+            typeinfo: TypeInfo
     ):
         self.name = name
         self.fullname = fullname
@@ -45,16 +48,67 @@ class ObjectBind:
 
 
 class FunctionInfo(OneNameSpace, ProperType):
-    strict: bool
-    is_async: bool
-    is_pure: Optional[bool]
-    name: Name
-    fullname: Name
-    params: Dict[Name, Tuple[Optional[TypeInfo], Optional[AST]]]
-    variables: List[Union[Name, TypeInfo]]
-    body: List[AST]
-    parent: Tuple['FunctionInfo']
+    strict: ClassVar[bool]
+    is_async: ClassVar[bool]
+    is_pure: ClassVar[Optional[bool]]
+    name: ClassVar[Name]
+    fullname: ClassVar[Name]
+    type_vars: ClassVar[Dict[Name, QTypeVar]]
+    params: ClassVar[Dict[Name, Tuple[TypeInfo, Optional[AST]]]]
+    throw: ClassVar[Optional[TypeInfo]]
+    variables: ClassVar[Dict[Name, TypeInfo]]
+    body: ClassVar[List[AST]]
+    parent: ClassVar[Optional['FunctionInfo']]
     top_level: ClassVar['ModuleMataInfo']
+
+    def __init__(
+            self,
+            is_async: bool,
+            name: Name,
+            fullname: Name,
+            body: List[AST],
+            parent: 'FunctionInfo',
+            top_level: 'ModuleMataInfo',
+            strict: bool = True,
+    ):
+        super().__init__()
+        self.strict = strict
+        self.is_async = is_async
+        self.name = name
+        self.fullname = fullname
+        self.is_pure = None
+        self.type_vars = {}
+        self.params = {}
+        self.throw = None
+        self.variables = {}
+        self.body = body
+        self.parent = parent
+        self.top_level = top_level
+
+    def add_symbol(self, name: Name, value: 'Context'):
+        self.variables[name] = value
+
+    def find_item(self, name: Name) -> TypeInfo:
+        r: Optional[TypeInfo] = self.params.get(name)
+        if r:
+            return r
+        r: Optional[TypeInfo] = self.variables.get(name)
+        if r:
+            return r
+        if self.parent:
+            r = self.parent.find_item(name)
+            if r:
+                return r
+        # r: Optional[TypeInfo] = self.get_top_level().find_name(name)
+        # if r:
+        #     return r
+        raise KeyError
+
+    def add_throw_type(self, typeinfo: TypeInfo):
+        if self.throw is None:
+            self.throw = typeinfo
+        else:
+            self.throw.join(typeinfo)
 
     def get_top_level(self) -> 'ModuleMataInfo':
         return self.top_level
@@ -63,6 +117,7 @@ class FunctionInfo(OneNameSpace, ProperType):
 class ClassInfo(TwoNameSpace, ProperType):
     name: ClassVar[Name]
     fullname: ClassVar[Name]
+    type_vars: ClassVar[Dict[Name, QTypeVar]]
     items: ClassVar[Dict[Name, TypeInfo]]
     methods: ClassVar[Dict[Name, FunctionInfo]]
     static_items: ClassVar[Dict[Name, Tuple[TypeInfo, AST]]]
@@ -80,6 +135,7 @@ class ClassInfo(TwoNameSpace, ProperType):
         super().__init__()
         self.name = name
         self.fullname = fullname
+        self.type_vars = {}
         self.items = {}
         self.methods = {}
         self.static_items = {}
@@ -160,11 +216,17 @@ class ModuleMataInfo(OneNameSpace):
         self.do_block = []
         self.export_list = []
 
+    def add_symbol(self, name: Name, value: 'Context'):
+        self.bind[name] = value
+
     def find_name(self, name: Name) -> Optional['Context']:
         r = self.bind.get(name)
         if r is None:
             r = self.import_list.get(name)
         return r
+
+    def get_prev_name(self) -> str:
+        return f'{self.fullname}.'
 
     def get_top_level(self) -> 'ModuleMataInfo':
         return self
