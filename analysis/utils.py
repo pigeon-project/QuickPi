@@ -3,9 +3,16 @@ from ast import AST
 from typing import Any
 from typing_extensions import ClassVar
 
-
-
 Name = str
+
+type_id_alloc: int = 0
+
+
+def alloc_type_id() -> int:
+    global type_id_alloc
+    res = type_id_alloc
+    type_id_alloc += 1
+    return res
 
 
 class PosInfo:

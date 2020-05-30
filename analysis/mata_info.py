@@ -1,10 +1,10 @@
 from ast import AST
 from pathlib import Path
-from typing import List, Dict, Union, Tuple, Optional, Set, TypeVar
+from typing import List, Dict, Union, Tuple, Optional, Set
 
 from typing_extensions import ClassVar
 
-from .utils import Name
+from .utils import Name, alloc_type_id
 
 
 class TypeInfo:
@@ -258,15 +258,6 @@ class ModuleMataInfo(OneNameSpace):
 
 Context = Union[ModuleMataInfo, FunctionInfo, ClassInfo, ObjectBind]
 
-type_id_alloc: int = 0
-
-
-def alloc_type_id() -> int:
-    global type_id_alloc
-    res = type_id_alloc
-    type_id_alloc += 1
-    return res
-
 
 class TypeRef(TypeInfo):
     name: ClassVar[Name]
@@ -341,6 +332,12 @@ class UnionType(ProperType):
     def __init__(self, i: Set[TypeInfo]):
         super().__init__()
         self.include_type = i
+
+    def join(self, other: 'TypeInfo') -> 'TypeInfo':
+        if isinstance(other, AnyType):
+            return AnyType()
+        self.include_type.add(other)
+        return self
 
 
 class TupleType(ProperType):
