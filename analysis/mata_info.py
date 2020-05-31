@@ -4,32 +4,39 @@ from typing import List, Dict, Union, Tuple, Optional, Set
 
 from typing_extensions import ClassVar
 
-from .utils import Name, alloc_type_id
+from .utils import Name, alloc_type_id, PosInfo
 
 
 class TypeInfo:
-    def __init__(self):
-        ...
+    type_id: ClassVar[int]
+    pos: ClassVar[Optional[PosInfo]]
+    top_level: ClassVar['ModuleMataInfo']
+
+    def __init__(self, top_level: 'ModuleMataInfo', pos: Optional[PosInfo] = None):
+        self.type_id = alloc_type_id()
+        self.top_level = top_level
+        self.pos = pos
 
     def __str__(self):
         ...
 
-    def join(self, other: 'TypeInfo') -> 'TypeInfo':
-        ...
+    # def join(self, other: 'TypeInfo') -> 'TypeInfo':
+    #     ...
 
-    def isinstense(self, other: 'TypeInfo') -> bool:
-        ...
+    # def isinstense(self, other: 'TypeInfo') -> bool:
+    #     ...
 
 
 class QTypeVar(TypeInfo):
-    pass
+    trait_constraint: ClassVar[Set['TraitInfo']]
 
 
 class ProperType(TypeInfo):
-    def join(self, other: 'TypeInfo') -> 'TypeInfo':
-        if isinstance(self, AnyType) or isinstance(other, AnyType):
-            return AnyType()
-        return UnionType({self, other})
+    # def join(self, other: 'TypeInfo') -> 'TypeInfo':
+    #     if isinstance(self, AnyType) or isinstance(other, AnyType):
+    #         return AnyType()
+    #     return UnionType({self, other})
+    pass
 
 
 class NameSpace:
@@ -71,8 +78,23 @@ class ObjectBind:
     # pass
 
 
+class CallableType(ProperType):
+    type_arrow: ClassVar[List[TypeInfo]]
+    throws: ClassVar[List[TypeInfo]]
+
+    def __init__(
+            self,
+            pos: PosInfo,
+            type_arrow: List[TypeInfo],
+            throws: List[TypeInfo],
+            top_level: 'ModuleMataInfo'
+    ):
+        super().__init__(top_level, pos)
+        self.type_arrow = type_arrow
+        self.throws = throws
+
+
 class FunctionInfo(OneNameSpace, ProperType):
-    strict: ClassVar[bool]
     is_async: ClassVar[bool]
     is_pure: ClassVar[Optional[bool]]
     name: ClassVar[Name]
@@ -89,13 +111,14 @@ class FunctionInfo(OneNameSpace, ProperType):
             self,
             name: Name,
             fullname: Name,
+            pos: PosInfo,
             body: List[AST],
             parent: 'FunctionInfo',
             top_level: 'ModuleMataInfo',
             is_async: bool = False,
             strict: bool = True,
     ):
-        super().__init__()
+        super().__init__(top_level, pos)
         self.strict = strict
         self.is_async = is_async
         self.name = name
@@ -129,13 +152,85 @@ class FunctionInfo(OneNameSpace, ProperType):
         raise KeyError
 
     def add_throw_type(self, typeinfo: TypeInfo):
-        if self.throw is None:
-            self.throw = typeinfo
-        else:
-            self.throw.join(typeinfo)
+        # if self.throw is None:
+        #     self.throw = typeinfo
+        # else:
+        #     self.throw.join(typeinfo)
+        pass
 
     def get_top_level(self) -> 'ModuleMataInfo':
         return self.top_level
+
+
+'''demo
+@forall(a)
+def id(a: a): a
+
+@entry_point
+def main(_):
+    a = id(1)
+    print(a)
+    0
+'''
+
+'''
+
+@trait
+@forall(T)
+class Add:
+    def __add__(self, other: T) -> T: ...
+
+def double(i): i + i
+
+# double :: (T | Add) -> (T | Add)
+
+@trait
+@forall(T)  
+class Enter:
+    def __enter__(self) -> T: ...
+
+@trait
+class Exit:
+    def __exit__(self) -> Unit: ...
+
+@trait
+def IDisposable(T): Enter[T] + Exit
+
+...
+with foo() as obj:
+    # obj :: (a | IDisposable[T])
+    ...
+...
+'''
+
+
+class TraitInfo(ProperType):
+    name: ClassVar[Name]
+    fullname: ClassVar[Name]
+    type_vars: ClassVar[List[QTypeVar]]
+    methods: ClassVar[List[CallableType]]
+
+    def __init__(
+            self,
+            pos: PosInfo,
+            name: Name,
+            fullname: Name,
+            type_vars: List[QTypeVar],
+            methods: List[CallableType],
+            top_level: 'ModuleMataInfo'
+    ):
+        super().__init__(top_level, pos)
+        self.name = name
+        self.fullname = fullname
+        self.type_vars = type_vars
+        self.methods = methods
+
+    def __str__(self):
+        return self.fullname
+
+
+class ImplInfo:
+    methods: ClassVar[List[FunctionInfo]]
 
 
 class ClassInfo(TwoNameSpace, ProperType):
@@ -144,60 +239,38 @@ class ClassInfo(TwoNameSpace, ProperType):
     type_vars: ClassVar[Dict[Name, QTypeVar]]
     items: ClassVar[Dict[Name, TypeInfo]]
     methods: ClassVar[Dict[Name, FunctionInfo]]
-    static_items: ClassVar[Dict[Name, Tuple[TypeInfo, AST]]]
-    static_function: ClassVar[Dict[Name, FunctionInfo]]
-    parent: ClassVar[List['ClassInfo']]
+    traits: ClassVar[Dict[Name, TraitInfo]]
+    impls: ClassVar[Dict[Name, ImplInfo]]
+    impl: ClassVar[ImplInfo]
     top_level: ClassVar['ModuleMataInfo']
 
     def __init__(
             self,
             name: Name,
             fullname: Name,
-            parent: List['ClassInfo'],
+            pos: PosInfo,
+            traits: Dict[Name, TraitInfo],
             top_level: 'ModuleMataInfo'
     ):
-        super().__init__()
+        super().__init__(top_level, pos)
         self.name = name
         self.fullname = fullname
         self.type_vars = {}
         self.items = {}
         self.methods = {}
-        self.static_items = {}
-        self.static_function = {}
-        self.parent = parent
-        self.top_level = top_level
+        self.traits = traits
+        self.impls = {}
 
     def get_top_level(self) -> 'ModuleMataInfo':
         return self.top_level
-
-    def is_instance(self, other: 'ClassInfo') -> bool:
-        if self is other:
-            return True
-        for i in self.parent:
-            if i.is_instance(other):
-                return True
-        return False
 
     def find_item(self, name: Name) -> TypeInfo:
         r: Optional[TypeInfo] = self.items.get(name)
         if r:
             return r
-        for i in self.parent:
-            r = i.find_item(name)
-            if r is not None:
-                return r
         raise KeyError
 
-    def find_static_item(self, name: Name) -> Tuple[TypeInfo, AST]:
-        r: Optional[Tuple[TypeInfo, AST]] = self.static_items.get(name)
-        if r:
-            return r
-        for i in self.parent:
-            r = i.find_static_item(name)
-            if r is not None:
-                return r
-        raise KeyError
-
+    '''
     def find_method(self, name: Name) -> FunctionInfo:
         r: Optional[FunctionInfo] = self.methods.get(name)
         if r is None:
@@ -206,15 +279,7 @@ class ClassInfo(TwoNameSpace, ProperType):
                 if r is not None:
                     return r
         raise KeyError
-
-    def find_static_method(self, name: Name) -> FunctionInfo:
-        r: Optional[FunctionInfo] = self.static_function.get(name)
-        if r is None:
-            for i in self.parent:
-                r = i.find_static_method(name)
-                if r is not None:
-                    return r
-        raise KeyError
+    '''
 
 
 class ModuleMataInfo(OneNameSpace):
@@ -223,8 +288,8 @@ class ModuleMataInfo(OneNameSpace):
     path: ClassVar[Path]
     import_list: ClassVar[Dict[Name, 'Context']]
     bind: ClassVar[Dict[Name, 'Context']]
-    do_block: ClassVar[List[AST]]
-    export_list: ClassVar[List[Name]]
+    # do_block: ClassVar[List[AST]]
+    # export_list: ClassVar[List[Name]]
 
     def __init__(
             self,
@@ -237,8 +302,8 @@ class ModuleMataInfo(OneNameSpace):
         self.path = path
         self.import_list = {}
         self.bind = {}
-        self.do_block = []
-        self.export_list = []
+        # self.do_block = []
+        # self.export_list = []
 
     def add_symbol(self, name: Name, value: 'Context'):
         self.bind[name] = value
@@ -256,7 +321,7 @@ class ModuleMataInfo(OneNameSpace):
         return self
 
 
-Context = Union[ModuleMataInfo, FunctionInfo, ClassInfo, ObjectBind]
+Context = Union[ModuleMataInfo, FunctionInfo, ClassInfo, TraitInfo, ObjectBind]
 
 
 class TypeRef(TypeInfo):
@@ -268,8 +333,10 @@ class TypeRef(TypeInfo):
             self,
             name: Name,
             # fullname: Optional[Name] = None,
+            top_level: 'ModuleMataInfo',
+            pos: Optional[PosInfo] = None,
             context: Optional[OneNameSpace] = None):
-        super().__init__()
+        super().__init__(top_level, pos)
         self.name = name
         # self.fullname = fullname
         self.context = context
@@ -284,15 +351,15 @@ class TypeRef(TypeInfo):
             return context.find_name(self.name)
         raise RuntimeError('没有绑定context还不传context？给爷爪巴')
 
-    def isinstense(self, other: 'TypeInfo', context: Optional[OneNameSpace] = None) -> bool:
-        return self.get_true_type().isinstense(other)
+    # def isinstense(self, other: 'TypeInfo', context: Optional[OneNameSpace] = None) -> bool:
+    #     return self.get_true_type().isinstense(other)
 
 
 class TypeId(QTypeVar):
     id: ClassVar[int]
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, top_level: 'ModuleMataInfo', pos: Optional[PosInfo] = None):
+        super().__init__(top_level, pos)
         self.id = alloc_type_id()
 
 
@@ -322,22 +389,22 @@ class TypeApply(ProperType):
     pass
 
 
-class TypedDictType(ProperType):
-    record: ClassVar[Dict[Name, TypeInfo]]
+# class TypedDictType(ProperType):
+#     record: ClassVar[Dict[Name, TypeInfo]]
 
 
-class UnionType(ProperType):
-    include_type: ClassVar[Set[TypeInfo]]
-
-    def __init__(self, i: Set[TypeInfo]):
-        super().__init__()
-        self.include_type = i
-
-    def join(self, other: 'TypeInfo') -> 'TypeInfo':
-        if isinstance(other, AnyType):
-            return AnyType()
-        self.include_type.add(other)
-        return self
+# class UnionType(ProperType):
+#     include_type: ClassVar[Set[TypeInfo]]
+#
+#     def __init__(self, i: Set[TypeInfo]):
+#         super().__init__()
+#         self.include_type = i
+#
+#     def join(self, other: 'TypeInfo') -> 'TypeInfo':
+#         if isinstance(other, AnyType):
+#             return AnyType()
+#         self.include_type.add(other)
+#         return self
 
 
 class TupleType(ProperType):
@@ -350,10 +417,12 @@ class ListType(ProperType):
 
 builtin_type = ('object', 'bool', 'int', 'float', 'str', 'tuple', 'list', 'set', 'dict')
 
-# builtin_object = TypeRef('bool', 'qpy.builtin.object')
-# builtin_none = TypeRef('none', 'qpy.builtin.none')
-# builtin_bool = TypeRef('bool', 'qpy.builtin.bool')
-# builtin_str = TypeRef('str', 'qpy.builtin.str')
-# builtin_int = TypeRef('int', 'qpy.builtin.int')
-# builtin_float = TypeRef('float', 'qpy.builtin.float')
-# builtin_bytes = TypeRef('bytes', 'qpy.builtin.bytes')
+builtin_module = ModuleMataInfo('builtins', 'quickpi.builtins', 'core/builtins.qpi')
+
+builtin_object = TypeRef('bool', builtin_module)
+builtin_none = TypeRef('none', builtin_module)
+builtin_bool = TypeRef('bool', builtin_module)
+builtin_str = TypeRef('str', builtin_module)
+builtin_int = TypeRef('int', builtin_module)
+builtin_float = TypeRef('float', builtin_module)
+builtin_bytes = TypeRef('bytes', builtin_module)

@@ -62,3 +62,10 @@ class AnalysisError(RuntimeError):
     def __str__(self):
         return f'AnalysisError: "{self.message}"\n' \
                f'\t File "{self.top_level.fullname}", line {self.pos.lineno}, col {self.pos.col_offset}'
+
+
+class TypeCheckError(AnalysisError):
+    def __str__(self):
+        return f'TypeCheckError: "{self.message}"\n' \
+               f'\t File "{self.top_level.fullname}", line {self.pos.lineno}, col {self.pos.col_offset}'
+
