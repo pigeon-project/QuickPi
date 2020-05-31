@@ -194,7 +194,7 @@ class Exit:
     def __exit__(self) -> Unit: ...
 
 @trait
-def IDisposable(T): Enter[T] + Exit
+class IDisposable(T): Enter[T] + Exit
 
 ...
 with foo() as obj:
@@ -239,7 +239,7 @@ class ClassInfo(TwoNameSpace, ProperType):
     type_vars: ClassVar[Dict[Name, QTypeVar]]
     items: ClassVar[Dict[Name, TypeInfo]]
     methods: ClassVar[Dict[Name, FunctionInfo]]
-    traits: ClassVar[Dict[Name, TraitInfo]]
+    traits: ClassVar[Dict[Name, Union['TypeRef', 'TypeApply']]]
     impls: ClassVar[Dict[Name, ImplInfo]]
     impl: ClassVar[ImplInfo]
     top_level: ClassVar['ModuleMataInfo']
@@ -327,7 +327,7 @@ Context = Union[ModuleMataInfo, FunctionInfo, ClassInfo, TraitInfo, ObjectBind]
 class TypeRef(TypeInfo):
     name: ClassVar[Name]
     # fullname: TypeVar[Optional[Name]]
-    context: ClassVar[Optional[OneNameSpace]]
+    context: ClassVar[Optional[Dict[Name, TypeInfo]]]
 
     def __init__(
             self,
@@ -341,14 +341,14 @@ class TypeRef(TypeInfo):
         # self.fullname = fullname
         self.context = context
 
-    def bind_context(self, context: OneNameSpace):
+    def bind_context(self, context: Dict[Name, TypeInfo]):
         self.context = context
 
-    def get_true_type(self, context: Optional[OneNameSpace] = None) -> ClassInfo:
+    def get_true_type(self, context: Optional[Dict[Name, TypeInfo]] = None) -> TypeInfo:
         if self.context:
-            return self.context.find_name(self.name)
+            return self.context[self.name]
         if context:
-            return context.find_name(self.name)
+            return context[self.name]
         raise RuntimeError('没有绑定context还不传context？给爷爪巴')
 
     # def isinstense(self, other: 'TypeInfo', context: Optional[OneNameSpace] = None) -> bool:
@@ -386,7 +386,19 @@ class NoneType(NoMemberType):
 
 
 class TypeApply(ProperType):
-    pass
+    typen: ClassVar[TypeRef]
+    type_prarms: ClassVar[List[TypeInfo]]
+
+    def __init__(
+            self,
+            top_level: 'ModuleMataInfo',
+            pos: PosInfo,
+            typen: TypeRef,
+            type_prarms: List[TypeInfo]
+    ):
+        super().__init__(top_level, pos)
+        self.typen = typen
+        self.type_prarms = type_prarms
 
 
 # class TypedDictType(ProperType):

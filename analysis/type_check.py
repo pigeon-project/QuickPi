@@ -20,6 +20,10 @@ from .utils import AnalysisError, PosInfo, AnalysisWarning, TypeCheckError
 # def type_assert(ast: AST, tp: TypeInfo):
 #     pass
 
+def apply_typevar(type_expr: TypeInfo, ):
+    pass
+
+
 def unify(t1: TypeInfo, t2: TypeInfo):
     if isinstance(t1, TypeRef) or isinstance(t2, TypeRef):
         if isinstance(t1, TypeRef):
@@ -31,7 +35,8 @@ def unify(t1: TypeInfo, t2: TypeInfo):
     if isinstance(t1, ClassInfo) and isinstance(t2, ClassInfo):
         if t1.fullname == t2.fullname and t1.type_vars == t2.type_vars:
             return
-        raise TypeCheckError(f"type '{t1.fullname}{t1.type_vars}' is not '{t2.fullname}{t2.type_vars}'", t2.pos, t2.top_level)
+        raise TypeCheckError(f"type '{t1.fullname}{t1.type_vars}' is not '{t2.fullname}{t2.type_vars}'", t2.pos,
+                             t2.top_level)
     if isinstance(t1, TraitInfo) and isinstance(t2, TraitInfo):
         if t1.fullname == t2.fullname and len(t1.type_vars) == 0:
             return
@@ -54,6 +59,7 @@ def check_arith_operation(context: Context, ast: AST, op: operator) -> TypeInfo:
     trait = context.get_top_level().find_name(op.__class__.__name__)
     assert isinstance(trait, TraitInfo)
     unify(left_type, trait)
+    # todo: apply typevar?
 
 
 def expr_infer(context: Context, ast: expr) -> TypeInfo:
@@ -82,10 +88,7 @@ def expr_infer(context: Context, ast: expr) -> TypeInfo:
 def block_infer(context: Context, exprs: typing.List[Expr]) -> TypeInfo:
     for i in exprs[:-1]:
         if isinstance(i, expr):
-            rt = expr_infer(context, i)
-            if not (isinstance(rt, BottomType) or isinstance(rt, NoneType)):
-                # FIXME
-                print(AnalysisWarning(f'Unused value of type {rt}', PosInfo(i), context.get_top_level()))
+            expr_check(context, i)
         if isinstance(i, stmt):
             stmt_check(context, i.value)
     return expr_infer(context, exprs[-1].value)
@@ -107,9 +110,7 @@ def ann_assign_check(context: Context, ast: AnnAssign):
     assert False
 
 
-def assign_check(context: Context, ast: Assign, strict: bool = True):
-    if strict:
-        pass
+def assign_check(context: Context, ast: Assign):
     pass
 
 
@@ -119,26 +120,31 @@ def with_check(context: Context, ast: typing.Union[With, AsyncWith]):
         raise AnalysisError("context error", PosInfo(ast), context.get_top_level())
     for i in ast.items:
         res = expr_infer(c1, i.context_expr)
-        # TODO: __enter__ and __exit__ method check
+        trait = context.get_top_level().find_name('IDisposable')
+        assert isinstance(trait, TraitInfo)
+        unify(res, trait)
         if i.optional_vars:
-            id = i.optional_vars.id
-            context.add_symbol(id, ObjectBind(
-                id, c1.get_top_level().get_prev_name() + id, res))
+            rid = i.optional_vars.id
+            context.add_symbol(rid, ObjectBind(
+                rid, c1.get_top_level().get_prev_name() + rid, res))
         else:
             print(AnalysisWarning(f'Unused value of type {res}', PosInfo(i), c1.get_top_level()))
     return block_infer(c1, ast.body)
 
 
-def stmt_check(context: Context, ast: stmt, strict: bool = True):
+def expr_check(context: Context, ast: expr):
+    rt = expr_infer(context, ast)
+    if not (isinstance(rt, BottomType) or isinstance(rt, NoneType)):
+        print(AnalysisWarning(f'Unused value of type {rt}', PosInfo(ast), context.get_top_level()))
+
+
+def stmt_check(context: Context, ast: stmt):
     if isinstance(ast, Expr):
-        res = expr_infer(context, ast.value)
-        if not (isinstance(res, BottomType) or isinstance(res, NoneType)):
-            # FIXME
-            print(AnalysisWarning(f'Unused value of type {res}', PosInfo(ast), context.get_top_level()))
+        expr_check(context, ast.value)
     if isinstance(ast, AnnAssign):
-        return ann_assign_check(context, ast)
+        ann_assign_check(context, ast)
     if isinstance(ast, Assign):
-        return assign_check(context, ast, strict)
+        assign_check(context, ast)
     if isinstance(ast, Raise):
         if isinstance(context, FunctionInfo):
             context.add_throw_type(type_infer(context, ast.exc))
@@ -154,7 +160,7 @@ def stmt_check(context: Context, ast: stmt, strict: bool = True):
     pass
 
 
-def type_check(context: Context, ast: AST, strict: bool = True):
+def type_check(context: Context, ast: AST):
     if isinstance(ast, stmt):
-        return stmt_check(context, ast, strict)
+        return stmt_check(context, ast)
     # type_infer(context, ast)
