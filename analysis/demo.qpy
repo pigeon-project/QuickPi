@@ -1,0 +1,38 @@
+
+@trait
+@forall(T, R)
+class Mapable:
+    def map(self, f: Callable[T, R]) -> R: ...
+
+
+@trait
+@forall(T)
+class Option(Mapable[T, R]):
+    @forall(R)
+    def map(self, f: Callable[T, R]) -> R: ...
+
+@trait
+@forall(T)
+class Some(Option[T]):
+    (T,)
+    @forall(R)
+    def map(self, f: Callable[T, R]) -> Option[R]:
+        (t0, ) = self
+        return Some(f(self.t0))
+
+@trait
+@forall(T)
+class _None(Option[T]):
+    @forall(R)
+    def map(self, f: Callable[T, R]) -> Option[R]:
+        return _None    
+    
+
+@forall(T, R)
+@trait
+class List(Mapable[T, R]):
+    (T, Option[List[T, R]])
+    
+    def map(self, f: Callable[T, R]) -> Self[R]:
+        (t0, t1) = self
+        List[f(t0), t1.map(f)]

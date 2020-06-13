@@ -1,7 +1,7 @@
 # import ast
 import typing
-from ast import AST, Num, Str, expr, Bytes, stmt, AnnAssign, BoolOp, Assign, Expr, Raise, With, AsyncWith, BinOp, Add, \
-    operator
+from ast import AST, Num, Str, expr, Bytes, stmt, AnnAssign, BoolOp, Assign, Expr, Raise, With, AsyncWith, BinOp, \
+    operator, UnaryOp
 
 from .mata_info import Context, ClassInfo, FunctionInfo, OneNameSpace, ObjectBind, TraitInfo, QTypeVar
 from .mata_info import TypeInfo, TypeRef, NoneType, BottomType
@@ -20,7 +20,7 @@ from .utils import AnalysisError, PosInfo, AnalysisWarning, TypeCheckError
 # def type_assert(ast: AST, tp: TypeInfo):
 #     pass
 
-def apply_typevar(type_expr: TypeInfo, ):
+def apply_typevar(_type_expr: TypeInfo, ):
     pass
 
 
@@ -54,12 +54,19 @@ def unify(t1: TypeInfo, t2: TypeInfo):
         raise TypeCheckError(f"found '{t2.trait_constraint}' need '{t1}'", t2.pos, t2.top_level)
 
 
-def check_arith_operation(context: Context, ast: AST, op: operator) -> TypeInfo:
+def infer_arith_operation(context: Context, ast: AST, op: operator) -> TypeInfo:
     left_type = type_infer(context, ast.values[0])
-    trait = context.get_top_level().find_name(op.__class__.__name__)
+    trait = context.get_top_level().find_name(op.__class__.__name__ + 'able')
     assert isinstance(trait, TraitInfo)
     unify(left_type, trait)
     # todo: apply typevar?
+
+
+def infer_unery_operation(context: Context, ast: AST, op: operator) -> TypeInfo:
+    op_type = type_infer(context, ast.values[0])
+    trait = context.get_top_level().find_name(op.__class__.__name__ + 'able')
+    assert isinstance(trait, TraitInfo)
+    unify(op_type, trait)
 
 
 def expr_infer(context: Context, ast: expr) -> TypeInfo:
@@ -74,7 +81,9 @@ def expr_infer(context: Context, ast: expr) -> TypeInfo:
     if isinstance(ast, Bytes):
         return builtin_bytes
     if isinstance(ast, BoolOp) or isinstance(ast, BinOp):
-        return check_arith_operation(context, ast, ast.op)
+        return infer_arith_operation(context, ast, ast.op)
+    if isinstance(ast, UnaryOp):
+        return infer_unery_operation(context, ast)
 
     raise RuntimeError('喵喵喵喵喵？')
     # left_type.
@@ -105,20 +114,27 @@ def type_infer(context: Context, ast: AST) -> TypeInfo:
 def ann_assign_check(context: Context, ast: AnnAssign):
     if isinstance(context, ClassInfo):
         raise AnalysisError("Context invalid", PosInfo(ast), context.get_top_level())
-    name = context.find_name(ast.target.id)
+    type_context = context.find_name(ast.target.id)
+    if type_context is not None:
+        raise AnalysisError("Type tag is not found", PosInfo(ast), context.get_top_level())
+    if not (isinstance(type_context, ClassInfo) or isinstance(type_context, TraitInfo)):
+        raise AnalysisError("Context invalid", PosInfo(ast), context.get_top_level())
 
-    assert False
 
-
-def assign_check(context: Context, ast: Assign):
+def assign_check(_context: Context, _ast: Assign):
     pass
 
 
-def with_check(context: Context, ast: typing.Union[With, AsyncWith]):
+def with_check(context: Context, ast: typing.Union[With, AsyncWith], is_async: bool = False):
     c1 = context  # 为了绕过类型检查
     if not isinstance(context, OneNameSpace):
         raise AnalysisError("context error", PosInfo(ast), context.get_top_level())
     for i in ast.items:
+        if is_async:
+            res = expr_infer(c1, ast.context_expr)
+            trait = context.get_top_level().find_name('Awaitable')
+            assert isinstance(trait, TraitInfo)
+            unify(res, trait)
         res = expr_infer(c1, i.context_expr)
         trait = context.get_top_level().find_name('IDisposable')
         assert isinstance(trait, TraitInfo)
@@ -153,10 +169,9 @@ def stmt_check(context: Context, ast: stmt):
     if isinstance(ast, With):
         with_check(context, ast)
     if isinstance(ast, AsyncWith):
-        # TODO: check function is async function code
         if isinstance(context, FunctionInfo) and context.is_async:
             print(AnalysisWarning("await is not in async function", PosInfo(ast), context.get_top_level()))
-        with_check(context, ast)
+        with_check(context, ast, is_async=True)
     pass
 
 
