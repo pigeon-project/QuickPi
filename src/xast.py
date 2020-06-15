@@ -2,8 +2,8 @@ from typing import List, Optional
 from enum import Enum
 import ast
 
-import mata_info as mi
-from mata_info import NameSpace
+import meta_info as mi
+from meta_info import NameSpace
 from bytecode import ByteCode
 from utils import trait, Name, PosInfo
 

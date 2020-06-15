@@ -2,7 +2,7 @@ from typing import Union, Dict, List, Tuple, Optional
 import ast as xast
 from ast import AST
 
-from mata_info import TypeInfo, NameSpace, Module, Function, TypeVar, TypeRef
+from meta_info import TypeInfo, NameSpace, Module, Function, TypeVar, TypeRef
 from utils import Name, PosInfo, AnalysisError
 
 

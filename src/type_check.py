@@ -3,7 +3,7 @@ import ast as xast
 from ast import AST
 
 from utils import Name, PosInfo, AnalysisError
-from mata_info import TypeInfo, NameSpace, Module, Function
+from meta_info import TypeInfo, NameSpace, Module, Function
 from create_tools import create_function
 
 
