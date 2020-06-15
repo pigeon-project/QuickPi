@@ -5,7 +5,7 @@ import ast
 import mata_info as mi
 from mata_info import NameSpace
 from bytecode import ByteCode
-from utils import trait, PosInfo
+from utils import trait, Name, PosInfo
 
 
 @trait
@@ -37,7 +37,7 @@ class stmt(XAST):
 
 
 class FunctionDef(stmt):
-    name: str
+    name: Name
     args: List[arg]
     body: List[stmt]
     decorator_list: List[expr]
@@ -54,7 +54,7 @@ class FunctionDef(stmt):
 
 
 class AsyncFunctionDef(stmt):
-    name: str
+    name: Name
     args: List[arg]
     body: List[stmt]
     decorator_list: List[expr]
@@ -76,7 +76,7 @@ class AsyncFunctionDef(stmt):
 
 
 class ClassDef(stmt):
-    name: str
+    name: Name
     bases: List[expr]
     body: List[stmt]
     decorator_list: List[expr]
@@ -121,6 +121,7 @@ class AugAssign(stmt):
     value: expr
 
     def __init__(self, inp: ast.AugAssign):
+        super().__init__(inp)
         self.target = expr.create(inp.target)
         self.value = expr.create(inp.value)
         self.op = operator(inp.op)
@@ -130,11 +131,182 @@ class AnnAssign(stmt):
     target: expr
     annotation: expr
     value: Optional[expr]
+    simple: int
 
     def __init__(self, inp: ast.AnnAssign):
+        super().__init__(inp)
         self.target = expr.create(inp.target)
         self.annotation = expr.create(inp.annotation)
         self.value = None if inp.value is None else expr.create(inp.value)
+        # self.simple = inp.simple
+        # TODO: What is inp.simple ?
+        # 小小的眼里有着大大的问号
+
+
+class For(stmt):
+    target: expr
+    iter: expr
+    body: List[stmt]
+    orelse: List[stmt]
+    
+    def __init__(self, inp: ast.For):
+        super().__init__(inp)
+        self.target = expr.create(inp.target)
+        self.iter = expr.create(inp.iter)
+        self.body = stmt.create_list(inp.body)
+        self.orelse = stmt.create_list(inp.orelse)
+
+
+class AsyncFor(stmt):
+    target: expr
+    iter: expr
+    body: List[stmt]
+    orelse: List[stmt]
+    
+    def __init__(self, inp: ast.AsyncFor):
+        super().__init__(inp)
+        self.target = expr.create(inp.target)
+        self.iter = expr.create(inp.iter)
+        self.body = stmt.create_list(inp.body)
+        self.orelse = stmt.create_list(inp.orelse)
+
+
+class While(stmt):
+    test: expr
+    body: List[stmt]
+    orelse: List[stmt]
+
+    def __init__(self, inp: ast.While):
+        # TODO: raise InvalidExprError
+        super().__init__(inp)
+        self.test = expr.create(inp.test)
+        self.body = stmt.create_list(inp.body)
+        self.orelse = stmt.create_list(inp.orelse)
+
+
+class If(stmt):
+    test: expr
+    body: List[stmt]
+    orelse: List[stmt]
+
+    def __init__(self, inp: ast.If):
+        super().__init__(inp)
+        self.test = expr.create(inp.test)
+        self.body = stmt.create_list(inp.body)
+        self.orelse = stmt.create_list(inp.orelse)
+
+
+class With(stmt):
+    items: List[withitem]
+    body: List[stmt]
+    
+    def __init__(self, inp: ast.With):
+        super().__init__(inp)
+        self.items = [withitem(i) for i in inp.items]
+        self.body = stmt.create_list(inp.body)
+
+
+class AsyncWith(stmt):
+    items: List[withitem]
+    body: List[stmt]
+    
+    def __init__(self, inp: ast.AsyncWith):
+        super().__init__(inp)
+        self.items = [withitem(i) for i in inp.items]
+        self.body = stmt.create_list(inp.body)
+
+
+class Raise(stmt):
+    exc: Optional[expr]
+    cause: Optional[expr]
+    
+    def __init__(self, inp: ast.Raise):
+        super().__init__(inp)
+        self.exc = None if inp.exc is None else expr.create(inp.exc)
+        self.cause = None if inp.cause is None else expr.create(inp.cause)
+
+
+class Try(stmt):
+    body: List[stmt]
+    handlers: List[excepthandler]
+    orelse: List[stmt]
+    finalbody: List[stmt]
+    
+    def __init__(self, inp: ast.Try):
+        super().__init__(inp)
+        self.body = stmt.create_list(inp.body)
+        self.orelse = stmt.create_list(inp.orelse)
+        self.finalbody = stmt.create_list(inp.finalbody)
+
+
+class Assert(stmt):
+    test: expr
+    msg: Optional[expr]
+    
+    def __init__(self, inp: ast.Assert):
+        super().__init__(inp)
+        self.test = expr.create(inp.test)
+        self.msg = None if inp.msg is None else expr.create(inp.msg)
+
+
+class Import(stmt):
+    names: List[alias]
+
+    def __init__(self, inp: ast.Import):
+        super().__init__(inp)
+        self.names = [alias(i) for i in inp.names]
+
+
+class ImportFrom(stmt):
+    module: Optional[Name]
+    names: List[alias]
+    # level: Optional[init]
+
+    def __init__(self, inp: ast.ImportFrom):
+        super().__init__(inp)
+        self.module = inp.module
+        self.names = [alias(i) for i in inp.names]
+        # self.level = inp.level
+        # TODO: What is level?
+        # 喵喵喵？
+
+
+class Global(stmt):
+    names: List[Name]
+    
+    def __init__(self, inp: ast.Global):
+        # TODO: raise InvalidExprError
+        super().__init__(inp)
+        self.names = inp.names
+
+
+class Nonlocal(stmt):
+    names: List[Name]
+    
+    def __init__(self, inp: ast.Nonlocal):
+        # TODO: raise InvalidExprError
+        super().__init__(inp)
+        self.names = inp.names
+
+
+class Expr(stmt):
+    value: expr
+
+    def __init__(self, inp: ast.Expr):
+        super().__init__(inp)
+        self.value = expr.create(inp.value)
+
+
+class ControlStatement(stmt, Enum):
+    Pass = 'Pass'
+    Break = 'Break'
+    Continue = 'Continue'
+
+    def __init__(self, inp: ast.operator):
+        super().__init__(inp)
+        # TODO: 
+        ...
+
 
 
 class expr(XAST):
@@ -148,7 +320,7 @@ class expr(XAST):
 
 
 class arg(XAST):
-    name: str
+    name: Name
     annotation: Optional[expr]
 
     def __init__(self, inp: ast.arg):
@@ -175,5 +347,39 @@ class operator(XAST, Enum):
     FloorDiv = 'FloorDiv'
 
     def __init__(self, inp: ast.operator):
+        super().__init__(inp)
         # TODO: 
         ...
+
+
+class excepthandler(XAST):
+    typ: Optional[expr]
+    name: Optional[Name]
+    body: List[stmt]
+
+    def __init__(self, inp: ast.ExceptHandler):
+        super().__init__(inp)
+        self.typ = None if inp.type is None else expr.create(inp.type)
+        self.name = inp.name
+        self.body = stmt.create_list(inp.body)
+
+
+class alias(XAST):
+    name: Name
+    asname: Optional[Name]
+
+    def __init__(self, inp: ast.alias):
+        super().__init__(inp)
+        self.name = inp.name
+        self.asname = inp.asname
+
+
+class withitem(XAST):
+    context_expr: expr
+    vars: Optional[expr]
+    
+    def __init__(self, inp: ast.withitem):
+        super().__init__(inp)
+        self.context_expr = expr.create(inp.context_expr)
+        self.vars = None if inp.optional_vars is None else expr.create(inp.optional_vars)
+        
