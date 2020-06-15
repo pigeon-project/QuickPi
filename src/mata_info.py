@@ -4,7 +4,7 @@ from functools import reduce
 from ast import AST, stmt
 from pathlib import Path
 
-from .utils import trait, Name, intersection, PosInfo, AnalysisError, alloc_type_id
+from utils import trait, Name, intersection, PosInfo, AnalysisError, alloc_type_id
 
 
 @trait

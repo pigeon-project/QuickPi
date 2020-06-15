@@ -2,9 +2,9 @@ from typing import Union, Dict, Tuple, Optional
 import ast as xast
 from ast import AST
 
-from .utils import Name, PosInfo, AnalysisError
-from .mata_info import TypeInfo, NameSpace, Module, Function
-from .create_tools import create_function
+from utils import Name, PosInfo, AnalysisError
+from mata_info import TypeInfo, NameSpace, Module, Function
+from create_tools import create_function
 
 
 def expr_check(ctx: NameSpace, ast: xast.expr) -> NameSpace:
