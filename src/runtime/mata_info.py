@@ -82,7 +82,7 @@ class TypeRef(TypeInfo):
 class NameSpace:
     def get_top_level(self) -> Module: ...
     def find_name(self, name: Name) -> Optional[Union[NameSpace, TypeInfo]]: ...
-    def register_name(self, name: Name, value: NameSpace): ...
+    def register_name(self, name: Name, value: NameSpace) -> None: ...
 
 
 @dataclass
@@ -181,5 +181,5 @@ class Scope(NameSpace, Positional):
     def register_name(self, name: Name, value: NameSpace) -> None:
         self.sub_namespace.append(value)
 
-    def bind_typedef(self, name: Name, value: TypeInfo):
+    def bind_typedef(self, name: Name, value: TypeInfo) -> None:
         self.bind[name] = value

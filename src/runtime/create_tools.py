@@ -10,8 +10,7 @@ from .utils import Name, PosInfo, AnalysisError
 
 def create_type(ctx: NameSpace, texpr: xast.expr) -> TypeInfo:
     if isinstance(texpr, xast.Name):
-        # TODO: create type name ref
-        pass
+        return TypeRef(texpr.id, ctx)
     if isinstance(texpr, xast.BinOp):
         # TODO:
         pass
@@ -42,14 +41,15 @@ def exist_forall(i: xast.expr) -> bool:
     return False
 
 def forall_detail(inp: List[xast.expr]) -> Optional[List[TypeVar]]:
-    r: List[TypeVar] = []
-    for i in inp:
+    def ff(i: xast.expr) -> TypeVar:
         if isinstance(i, xast.Name):
-            r.append(TypeVar(is_assign=True, name=i.id))
+            return TypeVar(is_assign=True, name=i.id)
         else:
-            return None
-    return r    
-
+            raise RuntimeWarning()
+    try:
+        return [ff(i) for i in inp]
+    except RuntimeError:
+        return None
 
 def create_function(
     ctx: NameSpace,
