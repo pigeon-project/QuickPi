@@ -8,6 +8,14 @@ from bytecode import ByteCode
 from utils import trait, Name, PosInfo
 
 
+def from_arguments_to_arg(inp: ast.arguments) -> List[arg]:
+    assert not inp.vararg
+    assert not inp.kwonlyargs
+    assert not inp.kw_defaults
+    assert not inp.kwarg
+    assert not inp.defaults
+    return [arg(i) for i in inp.args]
+
 @trait
 class XAST:
     pos: PosInfo
@@ -47,7 +55,7 @@ class FunctionDef(stmt):
     def __init__(self, inp: ast.FunctionDef):
         super().__init__(inp)
         self.name = inp.name
-        self.args = [arg(i) for i in inp.args.args]
+        self.args = from_arguments_to_arg(inp.args)
         self.body = stmt.create_list(inp.body)
         self.decorator_list = expr.create_list(inp.decorator_list)
         self.returns = None if inp.returns is None else expr.create(inp.returns)
@@ -63,13 +71,7 @@ class AsyncFunctionDef(stmt):
     def __init__(self, inp: ast.AsyncFunctionDef):
         super().__init__(inp)
         self.name = inp.name
-        args = inp.args
-        assert not args.vararg
-        assert not args.kwonlyargs
-        assert not args.kw_defaults
-        assert not args.kwarg
-        assert not args.defaults
-        self.args = [arg(i) for i in args.args]
+        self.args = from_arguments_to_arg(inp.args)
         self.body = stmt.create_list(inp.body)
         self.decorator_list = expr.create_list(inp.decorator_list)
         self.returns = None if inp.returns is None else expr.create(inp.returns)
@@ -319,18 +321,94 @@ class expr(XAST):
         return [expr.create(i) for i in inp]
 
 
-class arg(XAST):
-    name: Name
-    annotation: Optional[expr]
-
-    def __init__(self, inp: ast.arg):
+class BoolOp(expr):
+    op: boolop
+    values: List[expr]
+    
+    def __init__(self, inp: ast.BoolOp):
         super().__init__(inp)
-        self.name = inp.arg
-        self.annotation = None
-        if inp.annotation:
-            self.annotation = expr.create(inp.annotation)
-
+        self.op = boolop(inp.op)
+        self.values = expr.create_list(inp.values)
         
+class BinOp(expr):
+    left: expr
+    right: expr
+    op: operator
+
+    def __init__(self, inp: ast.BinOp):
+        super().__init__(inp)
+        self.left = expr.create(inp.left)
+        self.right = expr.create(inp.right)
+        self.op = operator(inp.op)
+
+
+class UnaryOp(expr):
+    op: unaryop
+    operand: expr
+
+    def __init__(self, inp: ast.UnaryOp):
+        super().__init__(inp)
+        self.op = unaryop(inp.op)
+        self.operand = expr.create(inp.operand)
+
+
+class Lambda(expr):
+    args: List[arg]
+    body: expr
+
+    def __init__(self, inp: ast.Lambda):
+        super().__init__(inp)
+        self.args = from_arguments_to_arg(inp.args)
+        self.body = expr.create(inp.body)
+
+
+class IfExp(expr):
+    test: expr
+    body: expr
+    orelse: expr
+    
+    def __init__(self, inp: ast.IfExp):
+        super().__init__(inp)
+        self.test = expr.create(inp.test)
+        self.body = expr.create(inp.test)
+        self.orelse = expr.create(inp.orelse)
+
+
+class Dict(expr):
+    keys: List[Optional[expr]]
+    values: List[expr]
+
+    def __init__(self, inp: ast.Dict):
+        super().__init__(inp)
+        self.keys = [
+            None if i is None else expr.create(i)
+                for i in inp.keys] # WTF???
+        self.values = expr.create_list(inp.values)
+    
+
+class Set(expr):
+    elts: List[expr]
+
+    def __init__(self, inp: ast.Set):
+        super().__init__(inp)
+        self.elts = expr.create_list(inp.elts)
+
+
+class boolop(XAST, Enum):
+    And = 'And'
+    Or = 'Or'
+
+    value: boolop
+
+    def __init__(self, inp: ast.boolop):
+        super().__init__(inp)
+        self.value = {
+            ast.And: boolop.And,
+            ast.Or: boolop.Or,
+        }[type(inp)]
+
+
+      
 class operator(XAST, Enum):
     Add = 'Add'
     Sub = 'Sub'
@@ -346,10 +424,29 @@ class operator(XAST, Enum):
     BitAnd = 'BitAnd'
     FloorDiv = 'FloorDiv'
 
+    value: operator
+
     def __init__(self, inp: ast.operator):
         super().__init__(inp)
         # TODO: 
         ...
+
+class unaryop(XAST, Enum):
+    Invert = 'Invert'
+    Not = 'Not'
+    UAdd = 'UAdd'
+    USub = 'USub'
+
+    value: unaryop
+
+    def __init__(self, inp: ast.unaryop):
+        super().__init__(inp)
+        self.value = {
+            ast.Invert: unaryop.Invert,
+            ast.Not: unaryop.Not,
+            ast.UAdd: unaryop.UAdd,
+            ast.USub: unaryop.USub,
+        }[type(inp)]
 
 
 class excepthandler(XAST):
@@ -362,6 +459,18 @@ class excepthandler(XAST):
         self.typ = None if inp.type is None else expr.create(inp.type)
         self.name = inp.name
         self.body = stmt.create_list(inp.body)
+
+
+class arg(XAST):
+    name: Name
+    annotation: Optional[expr]
+
+    def __init__(self, inp: ast.arg):
+        super().__init__(inp)
+        self.name = inp.arg
+        self.annotation = None
+        if inp.annotation:
+            self.annotation = expr.create(inp.annotation)
 
 
 class alias(XAST):
