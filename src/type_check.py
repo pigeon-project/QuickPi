@@ -1,30 +1,66 @@
 from typing import Union, Dict, Tuple, Optional
-import ast as xast
-from ast import AST
+import ast
+from functools import singledispatch
 
-from utils import Name, PosInfo, AnalysisError
-from meta_info import TypeInfo, NameSpace, Module, Function
+from utils import Name, PosInfo, AnalysisError, AnalysisWarning
+from meta_info import NameSpace, Module, Function, TypeInfo, TypeRef
 from create_tools import create_function
 
 
-def expr_check(ctx: NameSpace, ast: xast.expr) -> NameSpace:
-    pass
+class TypeNonUnifyError(RuntimeError): ...
 
-def stmt_check(ctx: NameSpace, ast: xast.stmt) -> NameSpace:
-    pass
 
-def stmt_check_in_module(ctx: Module, ast: xast.stmt) -> NameSpace:
-    if isinstance(ast, xast.FunctionDef) or isinstance(ast, xast.AsyncFunctionDef):
+@singledispatch
+def unify(t1: TypeInfo, t2: TypeInfo):
+    raise TypeNonUnifyError()
+
+
+@singledispatch
+def infer(ctx: NameSpace, inp: ast.AST) -> TypeInfo:
+    raise AnalysisError(
+        'Invalid input',
+        PosInfo(inp.lineno, inp.col_offset),
+        top_level=ctx.get_top_level())
+
+
+@infer.register
+def _(ctx: NameSpace, inp: ast.BoolOp) -> TypeInfo:
+    ...
+
+
+@singledispatch
+def check(ctx: NameSpace, inp: ast.AST):
+    raise AnalysisError(
+        'Invalid input',
+        PosInfo(inp.lineno, inp.col_offset),
+        top_level=ctx.get_top_level())
+
+
+@check.register
+def check_expr(ctx: NameSpace, inp: ast.Expr):
+    rt: TypeInfo = infer(inp.value)
+    try:
+        unify(rt, TypeRef('Unit').get_true_type())
+    except TypeNonUnifyError:
+        print(AnalysisWarning(
+            '[unify error]: Type is non unify',
+            PosInfo(inp.lineno, inp.col_offset), 
+            ctx.get_top_level()))
+
+
+
+# @check.register
+def stmt_check_in_module(ctx: Module, inp: ast.stmt) -> NameSpace:
+    if isinstance(ast, ast.FunctionDef) or isinstance(ast, ast.AsyncFunctionDef):
         functx = create_function(ctx, ast)
-        pass
     return ctx
 
-def module_check(ctx: Module, ast: xast.AST) -> Module:
-    if isinstance(ast, xast.Module):
+def module_check(ctx: Module, inp: ast.AST) -> Module:
+    if isinstance(ast, ast.Module):
         for i in ast.body:
             pass
         return ctx
     raise AnalysisError(
             '[context error]: module_check context is not module',
-            PosInfo(ast.lineno, ast.col_offset),
+            PosInfo(inp.lineno, inp.col_offset),
             ctx.get_top_level())

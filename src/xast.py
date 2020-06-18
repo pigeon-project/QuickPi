@@ -394,6 +394,110 @@ class Set(expr):
         self.elts = expr.create_list(inp.elts)
 
 
+class ListComp(expr):
+    elt: expr
+    generators: List[comprehension]
+    
+    def __init__(self, inp: ast.ListComp):
+        super().__init__(inp)
+        self.elts = expr.create(inp.elt)
+        self.generators = [comprehension(i) for i in inp.generators]
+
+
+class SetComp(expr):
+    elt: expr
+    generators: List[comprehension]
+    
+    def __init__(self, inp: ast.SetComp):
+        super().__init__(inp)
+        self.elts = expr.create(inp.elt)
+        self.generators = [comprehension(i) for i in inp.generators]
+
+
+class DictComp(expr):
+    key: expr
+    value: expr
+    generators: List[comprehension]
+    
+    def __init__(self, inp: ast.DictComp):
+        super().__init__(inp)
+        self.key = expr.create(inp.key)
+        self.value = expr.create(inp.value)
+        self.generators = [comprehension(i) for i in inp.generators]
+
+
+class GeneratorExp(expr):
+    elt: expr
+    generators: List[comprehension]
+    
+    def __init__(self, inp: ast.SetComp):
+        super().__init__(inp)
+        self.elts = expr.create(inp.elt)
+        self.generators = [comprehension(i) for i in inp.generators]
+
+
+class Await(expr):
+    value: expr
+
+    def __init__(self, inp: ast.Await):
+        super().__init__(inp)
+        self.value = expr.create(inp.value)
+
+
+class Yield(expr):
+    value: Optional[expr]
+
+    def __init__(self, inp: ast.Yield):
+        super().__init__(inp)
+        self.value = None if inp.value is None else expr.create(inp.value)
+
+
+class YieldFrom(expr):
+    value: expr
+
+    def __init__(self, inp: ast.YieldFrom):
+        super().__init__(inp)
+        self.value = expr.create(inp.value)
+
+
+class Compare(expr):
+    left: expr
+    ops: List[cmpop]
+    comparators: List[expr]
+
+    def __init__(self, inp: ast.Compare):
+        super().__init__(inp)
+        self.left = expr.create(inp.left)
+        self.ops = [cmpop(i) for i in inp.ops]
+        self.comparators = expr.create_list(inp.comparators)
+
+
+class Call(expr):
+    func: expr
+    args: List[expr]
+
+    def __init__(self, inp: ast.Call):
+        assert len(inp.keywords) == 0
+        super().__init__(inp)
+        self.func = expr.create(inp.func)
+        self.args = expr.create_list(inp.args)
+
+
+class Num(expr):
+    value: object
+
+    def __init__(self, inp: ast.Num):
+        super().__init__(inp)
+        self.value = inp.n
+
+
+class Str(expr):
+    value: str
+    def __init__(self, inp: ast.Str):
+        super().__init__(inp)
+        self.value = inp.s
+
+
 class boolop(XAST, Enum):
     And = 'And'
     Or = 'Or'
@@ -447,6 +551,39 @@ class unaryop(XAST, Enum):
             ast.UAdd: unaryop.UAdd,
             ast.USub: unaryop.USub,
         }[type(inp)]
+
+
+class cmpop(XAST, Enum):
+    Eq  = 'Eq'
+    NotEq = 'NotEq'
+    Lt = 'Lt'
+    LtE = 'LtE'
+    Gt   = 'Gt  '
+    GtE = 'GtE'
+    Is = 'Is'
+    IsNot = 'IsNot'
+    In = 'In'
+    NotIn = 'NotIn'
+
+    value: str
+
+    def __init__(self, inp: ast.cmpop):
+        super().__init__(inp)
+        ...
+
+
+class comprehension(XAST):
+    target: expr
+    iter: expr
+    ifs: List[expr]
+    is_async: int
+
+    def __init__(self, inp: ast.comprehension):
+        super().__init__(inp)
+        self.target = expr.create(inp.target)
+        self.iter = expr.create(inp.iter)
+        self.ifs = expr.create_list(inp.ifs)
+        self.is_async = inp.is_async
 
 
 class excepthandler(XAST):
