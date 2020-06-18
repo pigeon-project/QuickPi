@@ -3,9 +3,9 @@ from enum import Enum
 import ast
 
 import meta_info as mi
-from meta_info import strSpace
+from meta_info import NameSpace
 from bytecode import ByteCode
-from utils import trait, str, PosInfo
+from utils import trait, PosInfo
 
 
 def from_arguments_to_arg(inp: ast.arguments) -> List[arg]:
@@ -22,7 +22,7 @@ class XAST:
 
     def __init__(self, inp: ast.AST):
         self.pos = PosInfo(inp.lineno, inp.col_offset)
-    def type_check(self, ctx: strSpace): ...
+    def type_check(self, ctx: NameSpace): ...
     # def codegen(self, ctx: strSpace) -> ByteCode: ...
 
 
@@ -236,22 +236,22 @@ class Assert(stmt):
 
 
 class Import(stmt):
-    strs: List[alias]
+    strs: List[_alias]
 
     def __init__(self, inp: ast.Import):
         super().__init__(inp)
-        self.strs = [alias(i) for i in inp.names]
+        self.strs = [_alias(i) for i in inp.names]
 
 
 class ImportFrom(stmt):
     module: Optional[str]
-    strs: List[alias]
+    strs: List[_alias]
     # level: Optional[init]
 
     def __init__(self, inp: ast.ImportFrom):
         super().__init__(inp)
         self.module = inp.module
-        self.strs = [alias(i) for i in inp.names]
+        self.strs = [_alias(i) for i in inp.names]
         # self.level = inp.level
         # TODO: What is level?
         # 喵喵喵？
@@ -702,7 +702,7 @@ class excepthandler(XAST):
     def __init__(self, inp: ast.ExceptHandler):
         super().__init__(inp)
         self.typ = None if inp.type is None else expr.create(inp.type)
-        self.str = inp.str
+        self.str = inp.name
         self.body = stmt.create_list(inp.body)
 
 
@@ -718,14 +718,14 @@ class arg(XAST):
             self.annotation = expr.create(inp.annotation)
 
 
-class alias(XAST):
-    str: str
-    asstr: Optional[str]
+class _alias(XAST):
+    name: str
+    asname: Optional[str]
 
     def __init__(self, inp: ast.alias):
         super().__init__(inp)
-        self.str = inp.str
-        self.asstr = inp.asstr
+        self.name = inp.name
+        self.asstr = inp.asname
 
 
 class withitem(XAST):
