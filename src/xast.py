@@ -1,11 +1,11 @@
-from typing import List, Optional
+from typing import List, Optional, Union, Any
 from enum import Enum
 import ast
 
 import meta_info as mi
-from meta_info import NameSpace
+from meta_info import strSpace
 from bytecode import ByteCode
-from utils import trait, Name, PosInfo
+from utils import trait, str, PosInfo
 
 
 def from_arguments_to_arg(inp: ast.arguments) -> List[arg]:
@@ -22,8 +22,8 @@ class XAST:
 
     def __init__(self, inp: ast.AST):
         self.pos = PosInfo(inp.lineno, inp.col_offset)
-    def type_check(self, ctx: NameSpace): ...
-    # def codegen(self, ctx: NameSpace) -> ByteCode: ...
+    def type_check(self, ctx: strSpace): ...
+    # def codegen(self, ctx: strSpace) -> ByteCode: ...
 
 
 class Module(XAST):
@@ -45,47 +45,31 @@ class stmt(XAST):
 
 
 class FunctionDef(stmt):
-    name: Name
-    args: List[arg]
-    body: List[stmt]
-    decorator_list: List[expr]
-    returns: Optional[expr]
-    
-
-    def __init__(self, inp: ast.FunctionDef):
-        super().__init__(inp)
-        self.name = inp.name
-        self.args = from_arguments_to_arg(inp.args)
-        self.body = stmt.create_list(inp.body)
-        self.decorator_list = expr.create_list(inp.decorator_list)
-        self.returns = None if inp.returns is None else expr.create(inp.returns)
-
-
-class AsyncFunctionDef(stmt):
-    name: Name
+    is_async: bool
+    str: str
     args: List[arg]
     body: List[stmt]
     decorator_list: List[expr]
     returns: Optional[expr]
 
-    def __init__(self, inp: ast.AsyncFunctionDef):
+    def __init__(self, inp: Union[ast.FunctionDef, ast.AsyncFunctionDef]):
         super().__init__(inp)
-        self.name = inp.name
+        self.is_async = isinstance(inp, ast.AsyncFunctionDef)
+        self.str = inp.name
         self.args = from_arguments_to_arg(inp.args)
         self.body = stmt.create_list(inp.body)
         self.decorator_list = expr.create_list(inp.decorator_list)
         self.returns = None if inp.returns is None else expr.create(inp.returns)
-
 
 class ClassDef(stmt):
-    name: Name
+    str: str
     bases: List[expr]
     body: List[stmt]
     decorator_list: List[expr]
 
     def __init__(self, inp: ast.ClassDef):
         super().__init__(inp)
-        self.name = inp.name
+        self.str = inp.name
         # FIXME: check trait
         self.bases = expr.create_list(inp.bases)
         self.body = stmt.create_list(inp.body)
@@ -252,43 +236,43 @@ class Assert(stmt):
 
 
 class Import(stmt):
-    names: List[alias]
+    strs: List[alias]
 
     def __init__(self, inp: ast.Import):
         super().__init__(inp)
-        self.names = [alias(i) for i in inp.names]
+        self.strs = [alias(i) for i in inp.names]
 
 
 class ImportFrom(stmt):
-    module: Optional[Name]
-    names: List[alias]
+    module: Optional[str]
+    strs: List[alias]
     # level: Optional[init]
 
     def __init__(self, inp: ast.ImportFrom):
         super().__init__(inp)
         self.module = inp.module
-        self.names = [alias(i) for i in inp.names]
+        self.strs = [alias(i) for i in inp.names]
         # self.level = inp.level
         # TODO: What is level?
         # 喵喵喵？
 
 
 class Global(stmt):
-    names: List[Name]
+    strs: List[str]
     
     def __init__(self, inp: ast.Global):
         # TODO: raise InvalidExprError
         super().__init__(inp)
-        self.names = inp.names
+        self.strs = inp.names
 
 
 class Nonlocal(stmt):
-    names: List[Name]
+    strs: List[str]
     
     def __init__(self, inp: ast.Nonlocal):
         # TODO: raise InvalidExprError
         super().__init__(inp)
-        self.names = inp.names
+        self.strs = inp.names
 
 
 class Expr(stmt):
@@ -498,6 +482,130 @@ class Str(expr):
         self.value = inp.s
 
 
+class Byte(expr):
+    value: bytes
+    
+    def __init__(self, inp: ast.Bytes):
+        super().__init__(inp)
+        self.value = inp.s
+
+
+class JoinedStr(expr):
+    value: List[expr]
+    
+    def __init__(self, inp: ast.JoinedStr):
+        super().__init__(inp)
+        self.value = expr.create_list(inp.values)
+
+
+class FormattedValue(expr):
+    value: expr
+    conversion: Optional[int]
+    format_spec: Optional[expr]
+    
+    def __init__(self, inp: ast.FormattedValue):
+        super().__init__(inp)
+        self.value = expr.create(inp.value)
+        self.conversion = inp.conversion
+        self.format_spec = None if inp.format_spec is None else expr.create(inp.format_spec)
+
+
+class NameConstant(expr):
+    value: Any
+    
+    def __init__(self, inp: ast.NameConstant):
+        super().__init__(inp)
+        self.value = inp.value
+
+
+class Ellipsis(expr):
+    def __init__(self, inp: ast.Ellipsis):
+        super().__init__(inp)
+
+
+class Constant(expr):
+    value: Any
+    
+    def __init__(self, inp: ast.Constant):
+        super().__init__(inp)
+        self.value = inp.value
+
+
+class Attribute(expr):
+    value: expr
+    attr: str
+    # ctx: expr_context
+
+    def __init__(self, inp: ast.Attribute):
+        super().__init__(inp)
+        self.value = expr.create(inp.value)
+        self.attr = inp.attr
+        # self.ctx = expr_context(inp.ctx)
+
+
+
+class Subscript(expr):
+    value: expr
+    slice: slice
+    # ctx: expr_context
+    
+    def __init__(self, inp: ast.Subscript):
+        super().__init__(inp)
+        self.value = expr.create(inp.value)
+        self.slice = slice(inp.slice)
+        # self.ctx = expr_context(inp.ctx)
+
+
+class Starred(expr):
+    value: expr
+    # ctx: expr_context
+
+    def __init__(self, inp: ast.Starred):
+        super().__init__(inp)
+        self.value = expr.create(inp.value)
+        # self.ctx = expr_context(inp.ctx)
+
+
+class Name(expr):
+    id: str
+    # ctx: expr_context
+
+    def __init__(self, inp: ast.Name):
+        super().__init__(inp)
+        self.id = inp.id
+        # self.ctx = expr_context(inp.ctx)
+
+
+class _List(expr):
+    elts: List[expr]
+    # ctx: expr_context
+
+    def __init__(self, inp: ast.List):
+        super().__init__(inp)
+        self.elts = expr.create_list(inp.elts)
+        # self.ctx = expr_context(inp.ctx)
+
+class Tuple(expr):
+    elts: List[expr]
+    # ctx: expr_context
+
+    def __init__(self, inp: ast.Tuple):
+        super().__init__(inp)
+        self.elts = expr.create_list(inp.elts)
+        # self.ctx = expr_context(inp.ctx)
+
+
+class expr_context(XAST):
+    Load = 'Load'
+    Store = 'Store'
+    Del = 'Del'
+    AugLoad = 'AugLoad'
+    AugStore = 'AugStore'
+    Param = 'Param'
+
+    def __init__(self, inp: ast.expr_context):
+        super().__init__(inp)        
+
 class boolop(XAST, Enum):
     And = 'And'
     Or = 'Or'
@@ -588,36 +696,36 @@ class comprehension(XAST):
 
 class excepthandler(XAST):
     typ: Optional[expr]
-    name: Optional[Name]
+    str: Optional[str]
     body: List[stmt]
 
     def __init__(self, inp: ast.ExceptHandler):
         super().__init__(inp)
         self.typ = None if inp.type is None else expr.create(inp.type)
-        self.name = inp.name
+        self.str = inp.str
         self.body = stmt.create_list(inp.body)
 
 
 class arg(XAST):
-    name: Name
+    str: str
     annotation: Optional[expr]
 
     def __init__(self, inp: ast.arg):
         super().__init__(inp)
-        self.name = inp.arg
+        self.str = inp.arg
         self.annotation = None
         if inp.annotation:
             self.annotation = expr.create(inp.annotation)
 
 
 class alias(XAST):
-    name: Name
-    asname: Optional[Name]
+    str: str
+    asstr: Optional[str]
 
     def __init__(self, inp: ast.alias):
         super().__init__(inp)
-        self.name = inp.name
-        self.asname = inp.asname
+        self.str = inp.str
+        self.asstr = inp.asstr
 
 
 class withitem(XAST):
