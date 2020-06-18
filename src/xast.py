@@ -38,7 +38,34 @@ class Module(XAST):
 class stmt(XAST):
     @staticmethod
     def create(inp: ast.stmt) -> stmt:
-        ...
+        return {
+            ast.FunctionDef: FunctionDef,
+            ast.AsyncFunctionDef: FunctionDef,
+            ast.ClassDef: ClassDef,
+            ast.Return: Return,
+            ast.Delete: Delete,
+            ast.Assign: Assign,
+            ast.AnnAssign: AnnAssign,
+            ast.AugAssign: AugAssign,
+            ast.For: For,
+            ast.AsyncFor: AsyncFor,
+            ast.While: While,
+            ast.If: If,
+            ast.With: With,
+            ast.AsyncWith: AsyncWith,
+            ast.Raise: Raise,
+            ast.Try: Try,
+            ast.Assign: Assign,
+            ast.Import: Import,
+            ast.ImportFrom: ImportFrom,
+            ast.Global: Global,
+            ast.Nonlocal: Nonlocal,
+            ast.Expr: Expr,
+            ast.Pass: ControlStatement,
+            ast.Break: ControlStatement,
+            ast.Continue: ControlStatement,
+        }[type(inp)](inp)
+        
     @staticmethod
     def create_list(inp: List[ast.stmt]) -> List[stmt]:
         return [stmt.create(i) for i in inp]
@@ -62,14 +89,14 @@ class FunctionDef(stmt):
         self.returns = None if inp.returns is None else expr.create(inp.returns)
 
 class ClassDef(stmt):
-    str: str
+    name: str
     bases: List[expr]
     body: List[stmt]
     decorator_list: List[expr]
 
     def __init__(self, inp: ast.ClassDef):
         super().__init__(inp)
-        self.str = inp.name
+        self.name = inp.name
         # FIXME: check trait
         self.bases = expr.create_list(inp.bases)
         self.body = stmt.create_list(inp.body)
@@ -288,17 +315,53 @@ class ControlStatement(stmt, Enum):
     Break = 'Break'
     Continue = 'Continue'
 
-    def __init__(self, inp: ast.operator):
-        super().__init__(inp)
-        # TODO: 
-        ...
+    value: ControlStatement
 
+    def __init__(self, inp: ast.stmt):
+        super().__init__(inp)
+        self.value = {
+            ast.Pass: ControlStatement.Pass,
+            ast.Break: ControlStatement.Break,
+            ast.Continue: ControlStatement.Continue
+        }[type(inp)]
+        
 
 
 class expr(XAST):
     @staticmethod
     def create(inp: ast.expr) -> expr:
-        ...
+        return {
+            ast.BoolOp: BoolOp,
+            ast.BinOp: BinOp,
+            ast.UnaryOp: UnaryOp,
+            ast.Lambda: Lambda,
+            ast.IfExp: IfExp,
+            ast.Dict: Dict,
+            ast.Set: Set,
+            ast.ListComp: ListComp,
+            ast.SetComp: SetComp,
+            ast.DictComp: DictComp,
+            ast.GeneratorExp: GeneratorExp,
+            ast.Await: Await,
+            ast.Yield: Yield,
+            ast.YieldFrom: YieldFrom,
+            ast.Compare: Compare,
+            ast.Call: Call,
+            ast.Num: Num,
+            ast.Bytes: Bytes,
+            ast.Str: Str,
+            ast.JoinedStr: JoinedStr,
+            ast.FormattedValue: FormattedValue,
+            ast.NameConstant: NameConstant,
+            ast.Ellipsis: _Ellipsis,
+            ast.Attribute: Attribute,
+            ast.Subscript: Subscript,
+            ast.Starred: Starred,
+            ast.Name: Name,
+            ast.List: _List,
+            ast.Tuple: _Tuple
+        }[type(inp)](inp)
+        
 
     @staticmethod
     def create_list(inp: List[ast.expr]) -> List[expr]:
@@ -482,7 +545,7 @@ class Str(expr):
         self.value = inp.s
 
 
-class Byte(expr):
+class Bytes(expr):
     value: bytes
     
     def __init__(self, inp: ast.Bytes):
@@ -518,7 +581,7 @@ class NameConstant(expr):
         self.value = inp.value
 
 
-class Ellipsis(expr):
+class _Ellipsis(expr):
     def __init__(self, inp: ast.Ellipsis):
         super().__init__(inp)
 
@@ -585,7 +648,7 @@ class _List(expr):
         self.elts = expr.create_list(inp.elts)
         # self.ctx = expr_context(inp.ctx)
 
-class Tuple(expr):
+class _Tuple(expr):
     elts: List[expr]
     # ctx: expr_context
 
@@ -640,8 +703,22 @@ class operator(XAST, Enum):
 
     def __init__(self, inp: ast.operator):
         super().__init__(inp)
-        # TODO: 
-        ...
+        self.value = {
+            ast.Add: operator.Add,
+            ast.Sub: operator.Sub,
+            ast.Mult: operator.Mult,
+            ast.MatMult: operator.MatMult,
+            ast.Div: operator.Div,
+            ast.Mod: operator.Mod,
+            ast.Pow: operator.Pow,
+            ast.LShift: operator.LShift,
+            ast.RShift: operator.RShift,
+            ast.BitOr: operator.BitOr,
+            ast.BitXor: operator.BitXor,
+            ast.BitAnd: operator.BitAnd,
+            ast.FloorDiv: operator.FloorDiv,
+        }[type(inp)]
+
 
 class unaryop(XAST, Enum):
     Invert = 'Invert'
@@ -673,7 +750,7 @@ class cmpop(XAST, Enum):
     In = 'In'
     NotIn = 'NotIn'
 
-    value: str
+    value: cmpop
 
     def __init__(self, inp: ast.cmpop):
         super().__init__(inp)
