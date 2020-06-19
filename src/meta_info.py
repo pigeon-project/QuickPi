@@ -1,4 +1,4 @@
-from typing import List, Set, Iterable, Dict, Any, Optional, Tuple, Union
+from typing import List, Set, Iterable, Dict, Any, Optional, Tuple, Union, Type
 from dataclasses import dataclass
 from functools import reduce
 from ast import AST, stmt
@@ -12,7 +12,7 @@ class TypeInfo:
     tid: int
     is_assign: bool
 
-    def __new__(cls) -> TypeInfo:
+    def __new__(cls: Type[TypeInfo]) -> TypeInfo:
         instance = object.__new__(cls)
         instance.tid = alloc_type_id()
         # instance.is_assign = True
@@ -24,6 +24,8 @@ class TypeInfo:
         return self
 
     def get_traits(self) -> Set[TraitInfo]: ...
+    def unify(self: TypeInfo, other: TypeInfo): ...
+
 
 @trait
 class TraitInfo(TypeInfo):

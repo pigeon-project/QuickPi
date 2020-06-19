@@ -3,9 +3,9 @@ from enum import Enum
 import ast
 
 import meta_info as mi
-from meta_info import NameSpace
+from meta_info import NameSpace, TypeInfo, TypeRef
 from bytecode import ByteCode
-from utils import trait, PosInfo
+from utils import trait, PosInfo, AnalysisError, AnalysisWarning, TypeNonUnifyError
 
 
 def from_arguments_to_arg(inp: ast.arguments) -> List[arg]:
@@ -22,7 +22,19 @@ class XAST:
 
     def __init__(self, inp: ast.AST):
         self.pos = PosInfo(inp.lineno, inp.col_offset)
-    def type_check(self, ctx: NameSpace): ...
+
+    def type_infer(self, ctx: NameSpace) -> TypeInfo: ...
+
+    def type_check(self, ctx: NameSpace):
+        r = self.type_infer(ctx)
+        try:
+            r.unify(TypeRef('Unit').get_true_type())
+        except TypeNonUnifyError:
+            print(AnalysisWarning(
+                f"[warning]: eval result '{r}' is not use",
+                self.pos,
+                ctx.get_top_level()))
+
     # def codegen(self, ctx: strSpace) -> ByteCode: ...
 
 

@@ -7,13 +7,6 @@ from meta_info import NameSpace, Module, Function, TypeInfo, TypeRef
 from create_tools import create_function
 
 
-class TypeNonUnifyError(RuntimeError): ...
-
-
-@singledispatch
-def unify(t1: TypeInfo, t2: TypeInfo):
-    raise TypeNonUnifyError()
-
 
 @singledispatch
 def infer(ctx: NameSpace, inp: ast.AST) -> TypeInfo:
